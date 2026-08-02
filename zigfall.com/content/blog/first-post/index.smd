@@ -1,0 +1,17 @@
+---
+.title = "What is Project Zigfall?",
+.date = .date("2026-08-02"),
+.layout = "post.shtml",
+---
+
+First, a little context about me, I am Emre Güneyler. I have been participating in [JS13k](https://js13kgames.com/) every year since 2019. My highest rated game is [Coler](https://js13kgames.com/2020/games/coler) become 63th out of 200 games.
+I have a keen interest in chess, and programming, such that I developed my own language for expressing tactical ideas in chess and published a research blog post [How Queen's Die, Analysing 6 Million Puzzle Database](https://lichess.org/@/heroku/blog/how-queens-die-analysing-a-6-million-puzzle-database/jgN7WEdl).
+That introduced me to Zig, and Typescript is my favorite language, I have been a fan of Zig.
+
+# Project Zigfall
+
+I have started Project Zigfall, in order to make a 2D Platformer Game written in Zig, targeting Windows SDK, publishing on Steam, and keeping a weekly devlog and a blog about the process along the way.
+
+I hope you learn something.
+
+-- Emre

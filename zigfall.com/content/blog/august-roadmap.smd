@@ -1,0 +1,35 @@
+---
+.title = "This month's Roadmap",
+.date = .date("2026-08-02"),
+.layout = "post.shtml",
+---
+
+August 13th is the start of the JS13k jam. Until that time, we will be tackling with setting up a Zig project for our Project Zigfall. After the jam starts, we will move on to completing our jam game, which is basically the prototype for the Zigfall game.
+
+By the way the name of the game is not decided yet, it will be different from Zigfall, until then it will be referred as the Zigfall game.
+
+# Roadmap for August 2-13
+
+I will rougly sketch this on a day by day basis and try to stick to it. So in the end we can analyse how well we followed through.
+
+* **Day 2**: Initialize a Zig project, reading up on Windows SDK and DirectX, create a window and maybe render a triangle.
+
+* **Day 3**: Try to finish on Windows SDK, deal with input controls, or audio, establish a game loop.
+
+* **Day 4**: Read image files, render sprites, do animation, render text, basic shapes etc..
+
+* **Day 5**: Work on some characters, horizontal movement, camera, resolution scale viewport.
+
+* **Day 6**: Read level data, render tiles, do collisions, gravity jump fall etc..
+
+* **Day 7**: Establish some code architecture, try to bring pieces together.
+
+* **Day 8**: Audio work, try to play some music in game.
+
+* **Day 9**: Add some content to the game level, art, music, sounds effects.
+
+* **Day 10**: Research on feature extensions, and ideas for the future in the long term.
+
+* **Day 11**: Iterate iterate iterate.
+
+* **Day 12**: Springy menu animations, or research on shaders, like dithering.

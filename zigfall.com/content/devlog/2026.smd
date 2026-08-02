@@ -1,0 +1,22 @@
+---
+.title = "Devlog - 2026-August",
+.date = .date("2026-08-02"),
+.layout = "devlog.shtml",
+---
+[]($section.id('about'))
+# About this Devlog
+
+> This is a non-exhaustive, curated list of changes meant to help users quickly see what has improved since they last checked.
+>
+> You can [subscribe to this page via RSS]($link.page('devlog').alternative('rss')).
+>
+> This page lists entries for the current year, for past entries consult the
+[devlog archive](/devlog/).
+
+
+
+## [Hello Zigfall]($section.id("2026-08-02"))
+This is the first entry in this year's devlog created with
+[Zine](https://zine-ssg.io)!
+
+10 days left to start JS13k Game Jam, the prototype version of the game we will be writing in Zig is in development. I hope the JS13k version enters into top 100, meanwhile this week we will start with Windows SDK and create a window and render basic textures etc..

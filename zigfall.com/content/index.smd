@@ -1,0 +1,16 @@
+---
+.title = "Homepage",
+.date = .date("1990-01-01T00:00:00"),
+.layout = "index.shtml",
+---
+
+ZigFall is the developer blog and devlog for an Open Source 2D Platformer Game written in Zig.
+
+# About Devlogs
+
+Devlogs are published weekly containing news about the ongoing development progress.
+
+# Blog
+
+Blogs are published occasionally about a certain topic of interest regarding the development of the game.
+It will be mostly educational content about how we can possibly engineer a 2D Platformer game.

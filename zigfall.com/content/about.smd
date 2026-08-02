@@ -1,0 +1,13 @@
+---
+.title = "About",
+.date = .date("1990-01-01T00:00:00"),
+.layout = "index.shtml",
+---
+
+# About Project Zigfall
+Zigfall is an MIT-licensed hobby project created by [Emre Güneyler](https://eguneys.github.io).
+
+Zigfall is inspired by [JS13k](https://js13kgames.com/) game jam and [Zig](https://ziglang.org) programming language.
+
+- Source Code: https://github.com/eguneys/zigfall/
+- Twitch: https://www.twitch.tv/gsoutz

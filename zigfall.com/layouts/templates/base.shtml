@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title :text="$site.title"></title>
+		<link type="text/css" rel="stylesheet" href="$site.asset('style.css').link()">
+		<link type="text/css" rel="stylesheet" href="$site.asset('highlight.css').link()">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="$site.asset('Temml-Local.css').link()">
+		<script defer src="$site.asset('temml.min.js').link()"></script>
+		<script defer src="$site.asset('render-mathtex.js').link()"></script>
+		<!-- /mathtex -->
+		<!-- Google Sans Flex -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+		<!-- Google Sans Flex -->
+		<super>
+	</head>
+	<body id="body">
+		<h1 class="site-title" :text="$site.title"></h1>
+		<nav>
+			<a href="$site.page('').link()">Home</a>
+			&nbsp; • &nbsp;
+			<a href="$site.page('blog').link()">Blog</a>
+			<ctx :if="$site.page('devlog').subpages().first?()">
+				&nbsp; • &nbsp;
+				<a href="$if.link()">Devlog</a>
+			</ctx>
+		</nav>
+		<super>
+		<footer>
+			<hr>
+			<a href="$site.page('about').link()">Project Zigfall</a>
+		</footer>
+	</body>
+</html>
