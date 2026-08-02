@@ -1,0 +1,27 @@
+<rss version="2.0">
+  <channel>
+    <title>Welcome to ZigFall!</title>
+    <link>https://zigfall.com</link>
+    <description>Welcome to ZigFall! - Blog</description>
+    <generator>Zine -- https://zine-ssg.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Sun, 02 Aug 2026 14:26:23 +0000</lastBuildDate>
+    
+      <item>
+        <title>What is Project Zigfall?</title>
+        <description>&lt;p&gt;First, a little context about me, I am Emre Güneyler. I have been participating in &lt;a href=&quot;https://js13kgames.com/&quot;&gt;JS13k&lt;/a&gt; every year since 2019. My highest rated game is &lt;a href=&quot;https://js13kgames.com/2020/games/coler&quot;&gt;Coler&lt;/a&gt; become 63th out of 200 games. I have a keen interest in chess, and programming, such that I developed my own language for expressing tactical ideas in chess and published a research blog post &lt;a href=&quot;https://lichess.org/@/heroku/blog/how-queens-die-analysing-a-6-million-puzzle-database/jgN7WEdl&quot;&gt;How Queen’s Die, Analysing 6 Million Puzzle Database&lt;/a&gt;. That introduced me to Zig, and Typescript is my favorite language, I have been a fan of Zig.&lt;/p&gt;&lt;h1&gt;Project Zigfall&lt;/h1&gt;&lt;p&gt;I have started Project Zigfall, in order to make a 2D Platformer Game written in Zig, targeting Windows SDK, publishing on Steam, and keeping a weekly devlog and a blog about the process along the way.&lt;/p&gt;&lt;p&gt;I hope you learn something.&lt;/p&gt;&lt;p&gt;– Emre&lt;/p&gt;</description>
+        <link>https://zigfall.com/blog/first-post/</link>
+        <pubDate>Sun, 02 Aug 2026 00:00:00 +0000</pubDate>
+        <guid>https://zigfall.com/blog/first-post/</guid>
+      </item>
+    
+      <item>
+        <title>This month&apos;s Roadmap</title>
+        <description>&lt;p&gt;August 13th is the start of the JS13k jam. Until that time, we will be tackling with setting up a Zig project for our Project Zigfall. After the jam starts, we will move on to completing our jam game, which is basically the prototype for the Zigfall game.&lt;/p&gt;&lt;p&gt;By the way the name of the game is not decided yet, it will be different from Zigfall, until then it will be referred as the Zigfall game.&lt;/p&gt;&lt;h1&gt;Roadmap for August 2-13&lt;/h1&gt;&lt;p&gt;I will rougly sketch this on a day by day basis and try to stick to it. So in the end we can analyse how well we followed through.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 2&lt;/strong&gt;: Initialize a Zig project, reading up on Windows SDK and DirectX, create a window and maybe render a triangle.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 3&lt;/strong&gt;: Try to finish on Windows SDK, deal with input controls, or audio, establish a game loop.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 4&lt;/strong&gt;: Read image files, render sprites, do animation, render text, basic shapes etc..&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 5&lt;/strong&gt;: Work on some characters, horizontal movement, camera, resolution scale viewport.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 6&lt;/strong&gt;: Read level data, render tiles, do collisions, gravity jump fall etc..&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 7&lt;/strong&gt;: Establish some code architecture, try to bring pieces together.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 8&lt;/strong&gt;: Audio work, try to play some music in game.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 9&lt;/strong&gt;: Add some content to the game level, art, music, sounds effects.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 10&lt;/strong&gt;: Research on feature extensions, and ideas for the future in the long term.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 11&lt;/strong&gt;: Iterate iterate iterate.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Day 12&lt;/strong&gt;: Springy menu animations, or research on shaders, like dithering.&lt;/p&gt;&lt;/li&gt;&lt;/ul&gt;</description>
+        <link>https://zigfall.com/blog/august-roadmap/</link>
+        <pubDate>Sun, 02 Aug 2026 00:00:00 +0000</pubDate>
+        <guid>https://zigfall.com/blog/august-roadmap/</guid>
+      </item>
+    
+  </channel>
+</rss>

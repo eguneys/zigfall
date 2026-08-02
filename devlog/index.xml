@@ -1,0 +1,22 @@
+<rss version="2.0">
+  <channel>
+    <title>Welcome to ZigFall!</title>
+    <link>https://zigfall.com</link>
+    <description>Welcome to ZigFall! - Devlog</description>
+    <generator>Zine -- https://zine-ssg.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Sun, 02 Aug 2026 14:26:23 +0000</lastBuildDate>
+    
+      
+        <item>
+          <title>Hello Zigfall
+</title>
+          <description>&lt;div id=&quot;2026-08-02&quot;&gt;&lt;h2&gt;&lt;a class=&quot;&quot; href=&quot;#2026-08-02&quot;&gt;Hello Zigfall&lt;/a&gt;&lt;/h2&gt;&lt;p&gt;This is the first entry in this year’s devlog created with &lt;a href=&quot;https://zine-ssg.io&quot;&gt;Zine&lt;/a&gt;!&lt;/p&gt;&lt;p&gt;10 days left to start JS13k Game Jam, the prototype version of the game we will be writing in Zig is in development. I hope the JS13k version enters into top 100, meanwhile this week we will start with Windows SDK and create a window and render basic textures etc..&lt;/p&gt;&lt;/div&gt;</description>
+          <link>https://zigfall.com/devlog/#2026-08-02</link>
+          <pubDate>Sun, 02 Aug 2026 00:00:00 +0000</pubDate>
+          <guid>https://zigfall.com/devlog/#2026-08-02</guid>
+        </item>
+      
+    
+  </channel>
+</rss>
