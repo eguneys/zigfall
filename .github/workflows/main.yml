@@ -34,9 +34,7 @@ jobs:
           version: v0.10.0
 
       - name: Release
-        run: |
-        cd zigfall.com
-        zine release
+        run: cd zigfall.com && zine release
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
