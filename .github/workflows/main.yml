@@ -34,15 +34,16 @@ jobs:
           version: v0.10.0
 
       - name: Release
-        run: zine release
-
+        run: |
+        cd zigfall.com
+        zine release
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'public'
+          path: 'zigfall.com/public'
 
       - name: Deploy to GitHub Pages
         id: deployment
