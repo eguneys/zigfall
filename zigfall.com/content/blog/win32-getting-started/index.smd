@@ -318,7 +318,7 @@ This will initialize the Direct3D 11 Context. Here's how we will use it:
     }
 ```
 
-So runGameLoop takes in the context, and in the update loop we clear the screen:
+So `runGameLoop` takes in the context, and in the update loop we clear the screen:
 
 ```zig
 
@@ -345,3 +345,295 @@ So runGameLoop takes in the context, and in the update loop we clear the screen:
 ```
 
 At the end of this setup, and update, we will see our window clear to dark blue as expected.
+
+
+## Compile Shaders and Render the First Triangle
+
+Next step is to render the first triangle. But we need hlsl shaders and compile them using a tool that comes with Windows SDK called `fxc.exe`. Once you have that program, we will setup a build step to compile our hlsl shader so we can embed the shader bytecode directly into our program and not have to compile any shaders at runtime.
+
+Here is the `build.zig` that sets up this compilation build step.
+
+```zig
+    const shader_dir = "src/shaders";
+
+    const compile_vs = b.addSystemCommand(&.{
+        "bin/fxc.exe",                  "/nologo",
+        "/T",                           "vs_5_0",
+        "/E",                           "VSMain",
+        "/Fo",                          shader_dir ++ "/triangle_vs.cso",
+        shader_dir ++ "/triangle.hlsl",
+    });
+
+    const compile_ps = b.addSystemCommand(&.{
+        "bin/fxc.exe",                  "/nologo",
+        "/T",                           "ps_5_0",
+        "/E",                           "PSMain",
+        "/Fo",                          shader_dir ++ "/triangle_ps.cso",
+        shader_dir ++ "/triangle.hlsl",
+    });
+
+    // this removes the console when running the application but 
+    // for debugging leave it on to display runtime errors.
+    //exe.subsystem = .Windows;
+
+    exe.step.dependOn(&compile_vs.step);
+    exe.step.dependOn(&compile_ps.step);
+```
+
+add the following shader to your `src/shaders` directory and run the build to check if it compiles the shaders. Make sure you have `fxc.exe` available in `bin/fxc.exe` path.
+
+```
+// Compiled offline by fxc.exe (see build.zig) into DXBC bytecode that gets
+// @embedFile'd into the exe -- nothing in main.zig calls D3DCompile.
+
+struct VSInput
+{
+    float3 pos   : POSITION;
+    float4 color : COLOR;
+};
+
+struct PSInput
+{
+    float4 pos   : SV_POSITION;
+    float4 color : COLOR;
+};
+
+PSInput VSMain(VSInput input)
+{
+    PSInput output;
+    output.pos = float4(input.pos, 1.0);
+    output.color = input.color;
+    return output;
+}
+
+float4 PSMain(PSInput input) : SV_TARGET
+{
+    return input.color;
+}
+```
+
+Now we have a bunch of new bindings to import, and the shaders are embedded at compile time like this:
+
+```zig
+const vs_bytecode = @embedFile("shaders/triangle_vs.cso");
+const ps_bytecode = @embedFile("shaders/triangle_ps.cso");
+
+const ID3D11VertexShader = win32.graphics.direct3d11.ID3D11VertexShader;
+const ID3D11PixelShader = win32.graphics.direct3d11.ID3D11PixelShader;
+const D3D11_INPUT_ELEMENT_DESC = win32.graphics.direct3d11.D3D11_INPUT_ELEMENT_DESC;
+const ID3D11InputLayout = win32.graphics.direct3d11.ID3D11InputLayout;
+const D3D11_BUFFER_DESC = win32.graphics.direct3d11.D3D11_BUFFER_DESC;
+const D3D11_SUBRESOURCE_DATA = win32.graphics.direct3d11.D3D11_SUBRESOURCE_DATA;
+const ID3D11Buffer = win32.graphics.direct3d11.ID3D11Buffer;
+const D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST = win32.graphics.direct3d.D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+const D3D11_USAGE_IMMUTABLE = win32.graphics.direct3d11.D3D11_USAGE_IMMUTABLE;
+const D3D11_BIND_VERTEX_BUFFER = win32.graphics.direct3d11.D3D11_BIND_VERTEX_BUFFER;
+
+const DXGI_FORMAT_R32G32B32_FLOAT = win32.graphics.dxgi.common.DXGI_FORMAT_R32G32B32_FLOAT;
+const D3D11_INPUT_PER_VERTEX_DATA = win32.graphics.direct3d11.D3D11_INPUT_PER_VERTEX_DATA;
+```
+
+
+The following new code goes inside your init method:
+
+```zig
+
+const MyDirectXContext = struct {
+
+    // rest of fields
+
+    input_layout: *ID3D11InputLayout,
+    vertex_buffer: ID3D11Buffer,
+
+    fn deinit(self: *Self) void {
+        // rest
+        _ = self.input_layout.IUnknown.Release();
+        _ = self.vertex_buffer.IUnknown.Release();
+    }
+
+    fn init(hwnd: HWND) !MyDirectXContext {
+
+        // rest of the code
+
+        // Shader additions
+
+        var vertex_shader: *ID3D11VertexShader = undefined;
+        hr = device.CreateVertexShader(vs_bytecode, vs_bytecode.len, null, @ptrCast(&vertex_shader));
+        if (hr != HRESULT.S_OK) return error.CreateVertexShaderFailed;
+        defer _ = vertex_shader.IUnknown.Release();
+
+        var pixel_shader: *ID3D11PixelShader = undefined;
+        hr = device.CreatePixelShader(ps_bytecode, ps_bytecode.len, null, @ptrCast(&pixel_shader));
+        if (hr != HRESULT.S_OK) return error.CreatePixelShaderFailed;
+        defer _ = pixel_shader.IUnknown.Release();
+
+        const input_element_descs = [_]D3D11_INPUT_ELEMENT_DESC{
+            .{
+                .SemanticName = "POSITION",
+                .SemanticIndex = 0,
+                .Format = DXGI_FORMAT_R32G32B32_FLOAT,
+                .InputSlot = 0,
+                .AlignedByteOffset = 0,
+                .InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA,
+                .InstanceDataStepRate = 0,
+            },
+            .{
+                .SemanticName = "COLOR",
+                .SemanticIndex = 0,
+                .Format = DXGI_FORMAT_R32G32B32_FLOAT,
+                .InputSlot = 0,
+                .AlignedByteOffset = 12, // 3 floats of POSITION
+                .InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA,
+                .InstanceDataStepRate = 0,
+            },
+        };
+
+        var input_layout: *ID3D11InputLayout = undefined;
+        hr = device.CreateInputLayout(
+            &input_element_descs,
+            input_element_descs.len,
+            vs_bytecode,
+            vs_bytecode.len,
+            @ptrCast(&input_layout),
+        );
+        if (hr != HRESULT.S_OK) return error.CreateInputLayoutFailed;
+        errdefer _ = input_layout.IUnknown.Release();
+
+        // --- Vertex buffer: one small hardcoded triangle, in NDC space already
+        // (no view/projection matrix yet)
+        const Vertex = extern struct {
+            pos: [3]f32,
+            color: [4]f32,
+        };
+
+        const vertices = [_]Vertex{
+            .{ .pos = .{ 0.0, 0.5, 0.0 }, .color = .{ 1.0, 0.0, 0.0, 1.0 } },
+            .{ .pos = .{ 0.0, -0.5, 0.0 }, .color = .{ 0.0, 1.0, 0.0, 1.0 } },
+            .{ .pos = .{ -0.5, -0.5, 0.0 }, .color = .{ 0.0, 0.0, 1.0, 1.0 } },
+        };
+
+        var buffer_desc = D3D11_BUFFER_DESC{
+            .ByteWidth = @sizeOf(@TypeOf(vertices)),
+            .Usage = D3D11_USAGE_IMMUTABLE,
+            .BindFlags = D3D11_BIND_VERTEX_BUFFER,
+            .CPUAccessFlags = .{},
+            .MiscFlags = .{},
+            .StructureByteStride = 0,
+        };
+
+        var init_data = D3D11_SUBRESOURCE_DATA{
+            .pSysMem = &vertices,
+            .SysMemPitch = 0,
+            .SysMemSlicePitch = 0,
+        };
+
+        var vertex_buffer: ID3D11Buffer = undefined;
+        hr = device.CreateBuffer(&buffer_desc, &init_data, @ptrCast(&vertex_buffer));
+        if (hr != HRESULT.S_OK) return error.CreateVertexBufferFailed;
+        errdefer _ = vertex_buffer.IUnknown.Release();
+
+        // Everything above is set once; only Clear/Draw/Present repeat per frame.
+
+        context.IASetInputLayout(input_layout);
+        context.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        const stride: u32 = @sizeOf(Vertex);
+        const offset: u32 = 0;
+        context.IASetVertexBuffers(0, 1, @ptrCast(&vertex_buffer), &.{stride}, &.{offset});
+        context.VSSetShader(vertex_shader, null, 0);
+        context.PSSetShader(pixel_shader, null, 0);
+
+        return .{
+            .vertex_buffer = vertex_buffer,
+            .input_layout = input_layout,
+            // rest
+        };
+    }
+
+
+    // NEW: move previous draw operations in this method
+    fn draw(self: Self) void {
+        var clear_color = [4]f32{ 0.10, 0.10, 0.35, 1.0 };
+
+        self.context.ClearRenderTargetView(self.rtv, @ptrCast(&clear_color[0]));
+
+        self.context.Draw(3, 0); // 3 vertices
+
+        _ = self.swap_chain.Present(1, 0); // 1 = vsync on
+    }
+
+```
+
+
+call this draw method inside our game loop like this:
+
+```zig
+   // if (!running break);
+
+   cx.draw();
+
+   // update();
+   // render();
+```
+
+Congratulations for this output:
+[First Triangle](<$image.asset("first_triangle.png").alt("Rendering First Triangle")>)
+
+
+But somethings off. The triangle is not centered correctly. Let's try to fix it.
+
+First off change the vertices like this:
+
+```zig
+        const vertices = [_]Vertex{
+            .{ .pos = .{ 1.0, 1.0, 0.0 }, .color = .{ 1.0, 0.0, 0.0, 1.0 } },
+            .{ .pos = .{ 1.0, -1.0, 0.0 }, .color = .{ 0.0, 1.0, 0.0, 1.0 } },
+            .{ .pos = .{ -1.0, -1.0, 0.0 }, .color = .{ 0.0, 0.0, 1.0, 1.0 } },
+        };
+```
+
+Instead of 0.5, they are at the -1, and 1 corners, that is supposed to make the triangle cover the entire half of the screen no matter what the screen size is. Triangle will strecth.
+
+If that doesn't help, here are some changes you can try to resolve this issue:
+
+```zig
+    // this seems somewhat related to scaling the window
+    _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+```
+
+Note that I am not giving you where the corresponding bindings are located anymore, you can expect to find them yourself at this point.
+
+More on let's subtract the title area from the rendered client area:
+
+```zig
+
+const client_width: i32 = 1280;
+const client_height: i32 = 720;
+
+    // ...
+    var window_rect = RECT{ .left = 0, .top = 0, .right = client_width, .bottom = client_height };
+    _ = AdjustWindowRectEx(&window_rect, WS_OVERLAPPEDWINDOW, FALSE, .{});
+```
+
+When creating a window like this:
+
+```zig
+
+    const hwnd = CreateWindowExA(
+        .{},
+        class_name,
+        "Zig Window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        window_rect.right - window_rect.left,
+        window_rect.bottom - window_rect.top,
+        null,
+        null,
+        @ptrCast(hInstance),
+        null,
+    );
+
+```
+
+At this point, you shall see the triangle covering the full half side of the screen. Good job.
