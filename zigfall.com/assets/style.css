@@ -52,7 +52,7 @@ nav {
 }
 
 pre {
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 
 img {
