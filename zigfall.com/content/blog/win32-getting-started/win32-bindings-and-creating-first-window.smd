@@ -115,4 +115,54 @@ fn processWindowMessage(hwnd: HWND, msg: u32, wParam: WPARAM, lParam: LPARAM) ca
 }
 ```
 
+The window immediately closes because our main function exits. We need to run a game loop so the program never exits, until the user explicitly closes the program.
 
+## The Game Loop
+
+Here's the minimal game loop with required bindings:
+
+```zig
+const MSG = win32.ui.windows_and_messaging.MSG;
+const PeekMessageA = win32.user32.PeekMessageA;
+const PM_REMOVE = win32.ui.windows_and_messaging.PM_REMOVE;
+
+const WM_QUIT = win32.ui.windows_and_messaging.WM_QUIT;
+const TranslateMessage = win32.user32.TranslateMessage;
+const DispatchMessageA = win32.user32.DispatchMessageA;
+
+fn runGameLoop() !void {
+    var msg: MSG = undefined;
+
+    var running = true;
+
+    while (running) {
+        while (PeekMessageA(&msg, null, 0, 0, PM_REMOVE) != 0) {
+            if (msg.message == WM_QUIT) {
+                running = false;
+                break;
+            }
+
+            _ = TranslateMessage(&msg);
+            _ = DispatchMessageA(&msg);
+        }
+
+        if (!running) break;
+
+        // update();
+        // render();
+    }
+}
+```
+
+Call this at the end of the main function. So we Show the Window, and enter into this loop.
+
+```zig
+try runGameLoop();
+```
+
+`processWindowMessage` is always called by windows, for handling user events like input or other window messages, but we have to listen to those messages with `PeekMessageA` and explicitly dispatch them to windows with `DispatchMessage` so windows calls this method for us with the user messages.
+This is why our game loop calls `PeekMessageA` and `DispatchMessageA` to check for any messages and let the windows call our handler.
+
+We will fill our handler to listen for keyboard events, and set our state we can use later.
+
+The important thing at this milestone is when you add this piece of code and run it, the window will stay open until you close it.
