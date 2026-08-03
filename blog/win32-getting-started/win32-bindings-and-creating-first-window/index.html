@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title>Welcome to ZigFall!</title>
+		<link type="text/css" rel="stylesheet" href="/style.css">
+		<link type="text/css" rel="stylesheet" href="/highlight.css">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="/Temml-Local.css">
+		<script defer src="/temml.min.js"></script>
+		<script defer src="/render-mathtex.js"></script>
+		<!-- /mathtex -->
+		<!-- Google Sans Flex -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+		<!-- Google Sans Flex -->
+		<!-- Google tag (gtag.js) -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZFVQKS2D1W"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+
+			gtag('config', 'G-ZFVQKS2D1W');
+		</script>
+		
+	<style>
+		#prev-next {
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+			margin-top: 40px;
+		}
+		
+		figure {
+			align-self: center;
+			text-align: center;
+			font-style: italic;
+		}
+		
+		.post {
+			display:flex;
+			flex-direction: column;
+		}
+	</style>
+
+	</head>
+	<body id="body">
+		<h1 class="site-title">Welcome to ZigFall!</h1>
+		<nav>
+			<a href="/">Home</a>
+			&nbsp; • &nbsp;
+			<a href="/blog/">Blog</a>
+			
+				&nbsp; • &nbsp;
+				<a href="/devlog/2026/">Devlog</a>
+			
+		</nav>
+		
+	<h1>Win32 Bindings and Creating First Window</h1>
+	<div class="post"><h1>Getting Started with Win32 Bindings</h1><p>In order to call Win32 API from Zig, we need bindings. The most up to date bindings I have found is in this repo <a href="https://github.com/marlersoft/zigwin32">marlersoft/zigwin32</a>, which are most comprehensive and automatically generated.</p><p>After you add that to your Zig project, here are some of the required imports we will be using to create our minimal window example:</p><pre><code class="zig"><span class="keyword">const</span> <span class="module constant variable_builtin type variable">win32</span> <span class="operator">=</span> <span class="function_builtin keyword_import">@import</span><span class="punctuation_bracket">(</span><span class="string">&quot;win32/zigwin32/win32.zig&quot;</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">GetModuleHandleA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">kernel32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">GetModuleHandleA</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">RegisterClassExA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">RegisterClassExA</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">WNDCLASSEXA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ui</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windows_and_messaging</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">WNDCLASSEXA</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">CreateWindowExA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">CreateWindowExA</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">GetLastError</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">kernel32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">GetLastError</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">ShowWindow</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ShowWindow</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">SW_SHOW</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ui</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windows_and_messaging</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">SW_SHOW</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">HWND</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">foundation</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">HWND</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">WPARAM</span> <span class="operator">=</span> <span class="type_builtin">usize</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">LPARAM</span> <span class="operator">=</span> <span class="type_builtin">isize</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">LRESULT</span> <span class="operator">=</span> <span class="type_builtin">isize</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">LoadCursorA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">LoadCursorA</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">WS_OVERLAPPEDWINDOW</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ui</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windows_and_messaging</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">WS_OVERLAPPEDWINDOW</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">CW_USEDEFAULT</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ui</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windows_and_messaging</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">CW_USEDEFAULT</span><span class="punctuation_delimiter">;</span>
+
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">WM_DESTROY</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">ui</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windows_and_messaging</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">WM_DESTROY</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">PostQuitMessage</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">PostQuitMessage</span><span class="punctuation_delimiter">;</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">DefWindowProcA</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">win32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">user32</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">DefWindowProcA</span><span class="punctuation_delimiter">;</span>
+</code></pre>
+<p>And here is the most minimal code that spawns a window and immediately closes it:</p><pre><code class="zig">
+<span class="keyword_modifier">pub</span> <span class="keyword_function">fn</span> <span class="constant variable_builtin type variable function">main</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">init</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">std</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">process</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">Init</span><span class="punctuation_bracket">)</span> <span class="operator">!</span><span class="type_builtin">void</span> <span class="punctuation_bracket">{</span>
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">arena</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">std</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">mem</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">Allocator</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">init</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">arena</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">allocator</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">args</span> <span class="operator">=</span> <span class="keyword_exception">try</span> <span class="constant variable_builtin type variable">init</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">minimal</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">args</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">toSlice</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">arena</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="keyword_repeat">for</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">args</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket operator">|</span><span class="constant variable_builtin variable_parameter variable type">arg</span><span class="punctuation_bracket operator">|</span> <span class="punctuation_bracket">{</span>
+        <span class="constant variable_builtin type variable">std</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">log</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">info</span><span class="punctuation_bracket">(</span><span class="string">&quot;arg: {s}&quot;</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span><span class="constant variable_builtin type variable">arg</span><span class="punctuation_bracket">}</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span>
+
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">io</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">init</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">io</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword">var</span> <span class="constant variable_builtin type variable">stdout_buffer</span><span class="punctuation_delimiter">:</span> <span class="punctuation_bracket">[</span><span class="number">1024</span><span class="punctuation_bracket">]</span><span class="type_builtin">u8</span> <span class="operator">=</span> <span class="constant_builtin">undefined</span><span class="punctuation_delimiter">;</span>
+    <span class="keyword">var</span> <span class="constant variable_builtin type variable">stdout_file_writer</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">Io</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">File</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">Writer</span> <span class="operator">=</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin function_call variable type">init</span><span class="punctuation_bracket">(</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin function_call variable type">stdout</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">io</span><span class="punctuation_delimiter">,</span> <span class="operator">&amp;</span><span class="constant variable_builtin type variable">stdout_buffer</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">stdout_writer</span> <span class="operator">=</span> <span class="operator">&amp;</span><span class="constant variable_builtin type variable">stdout_file_writer</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">interface</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword_exception">try</span> <span class="constant variable_builtin type variable">stdout_writer</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">flush</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">hInstance</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetModuleHandleA</span><span class="punctuation_bracket">(</span><span class="constant_builtin">null</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">class_name</span> <span class="operator">=</span> <span class="string">&quot;MyWindowClass&quot;</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">wc</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">WNDCLASSEXA</span><span class="punctuation_bracket">{</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">cbSize</span> <span class="operator">=</span> <span class="function_builtin">@sizeOf</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">WNDCLASSEXA</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">style</span> <span class="operator">=</span> <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span><span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">lpfnWndProc</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">processWindowMessage</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">cbClsExtra</span> <span class="operator">=</span> <span class="number">0</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">cbWndExtra</span> <span class="operator">=</span> <span class="number">0</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hInstance</span> <span class="operator">=</span> <span class="function_builtin">@ptrCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hInstance</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hIcon</span> <span class="operator">=</span> <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hCursor</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">LoadCursorA</span><span class="punctuation_bracket">(</span><span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@ptrFromInt</span><span class="punctuation_bracket">(</span><span class="number">32512</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hbrBackground</span> <span class="operator">=</span> <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">lpszMenuName</span> <span class="operator">=</span> <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">lpszClassName</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">class_name</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hIconSm</span> <span class="operator">=</span> <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+    <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">;</span>
+
+    <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">RegisterClassExA</span><span class="punctuation_bracket">(</span><span class="operator">&amp;</span><span class="constant variable_builtin type variable">wc</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword">const</span> <span class="constant variable_builtin type variable">hwnd</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">CreateWindowExA</span><span class="punctuation_bracket">(</span>
+        <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span><span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">class_name</span><span class="punctuation_delimiter">,</span>
+        <span class="string">&quot;Zig Window&quot;</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">WS_OVERLAPPEDWINDOW</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">CW_USEDEFAULT</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">CW_USEDEFAULT</span><span class="punctuation_delimiter">,</span>
+        <span class="number">640</span><span class="punctuation_delimiter">,</span>
+        <span class="number">480</span><span class="punctuation_delimiter">,</span>
+        <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+        <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+        <span class="function_builtin">@ptrCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hInstance</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span>
+        <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+    <span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+    <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket operator">|</span><span class="constant variable_builtin variable_parameter variable type">hwndV</span><span class="punctuation_bracket operator">|</span> <span class="punctuation_bracket">{</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">ShowWindow</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwndV</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">SW_SHOW</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span> <span class="keyword_conditional">else</span> <span class="punctuation_bracket">{</span>
+        <span class="keyword">const</span> <span class="constant variable_builtin type variable">err</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetLastError</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">std</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">debug</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">print</span><span class="punctuation_bracket">(</span><span class="string">&quot;CreateWindowExA failed, GetLastError, {}</span><span class="string string_escape">\n</span><span class="string">&quot;</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span><span class="constant variable_builtin type variable">err</span><span class="punctuation_bracket">}</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword_return">return</span> <span class="keyword">error</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable">CreateWindowFailed</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span>
+<span class="punctuation_bracket">}</span>
+
+<span class="keyword_function">fn</span> <span class="constant variable_builtin type variable function">processWindowMessage</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">hwnd</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">HWND</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin variable_parameter variable type">msg</span><span class="punctuation_delimiter">:</span> <span class="type_builtin">u32</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin variable_parameter variable type">wParam</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">WPARAM</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin variable_parameter variable type">lParam</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">LPARAM</span><span class="punctuation_bracket">)</span> <span class="keyword_modifier">callconv</span><span class="punctuation_bracket">(</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable">winapi</span><span class="punctuation_bracket">)</span> <span class="constant variable_builtin type variable">LRESULT</span> <span class="punctuation_bracket">{</span>
+    <span class="keyword_conditional">switch</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">msg</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+        <span class="constant variable_builtin type variable">WM_DESTROY</span> <span class="punctuation_delimiter">=&gt;</span> <span class="punctuation_bracket">{</span>
+            <span class="constant variable_builtin function_call variable type">PostQuitMessage</span><span class="punctuation_bracket">(</span><span class="number">0</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+            <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="keyword_conditional">else</span> <span class="punctuation_delimiter">=&gt;</span> <span class="keyword_return">return</span> <span class="constant variable_builtin function_call variable type">DefWindowProcA</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">msg</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">wParam</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">lParam</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">,</span>
+    <span class="punctuation_bracket">}</span>
+<span class="punctuation_bracket">}</span>
+</code></pre>
+</div>
+	<div id="prev-next">
+		<div>
+			<a href="/blog/first-post/">
+				←
+				<span>What is Project Zigfall?</span>
+			</a>
+		</div>
+		<div></div>
+	</div>
+
+		<footer>
+			<hr>
+			<a href="/about/">Project Zigfall</a>
+		</footer>
+	</body>
+</html>
