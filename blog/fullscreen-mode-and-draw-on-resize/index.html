@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+	<head id="head">
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1">
+		<title>Welcome to ZigFall!</title>
+		<link type="text/css" rel="stylesheet" href="/style.css">
+		<link type="text/css" rel="stylesheet" href="/highlight.css">
+		<!-- mathtex -->
+		<link type="text/css" rel="stylesheet" href="/Temml-Local.css">
+		<script defer src="/temml.min.js"></script>
+		<script defer src="/render-mathtex.js"></script>
+		<!-- /mathtex -->
+		<!-- Google Sans Flex -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+		<!-- Google Sans Flex -->
+		<!-- Google tag (gtag.js) -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZFVQKS2D1W"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+
+			gtag('config', 'G-ZFVQKS2D1W');
+		</script>
+
+		<link type="text/css" rel="stylesheet" href="/extra.css">
+		
+	<style>
+		#prev-next {
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+			margin-top: 40px;
+		}
+		
+		figure {
+			align-self: center;
+			text-align: center;
+			font-style: italic;
+		}
+		
+		.post {
+			display:flex;
+			flex-direction: column;
+		}
+	</style>
+
+	</head>
+	<body id="body">
+		<h1 class="site-title">Welcome to ZigFall!</h1>
+		<nav>
+			<a href="/">Home</a>
+			&nbsp; • &nbsp;
+			<a href="/blog/">Blog</a>
+			
+				&nbsp; • &nbsp;
+				<a href="/devlog/2026/">Devlog</a>
+			
+		</nav>
+		
+	<h1>Fullscreen Mode and Draw while Resizing</h1>
+	<div class="post"><p>We want to toggle Fullscreen Mode when user presses Alt+Enter. This is possible in 2 different ways, and I realized DirectX supports this out of the box when you create a default setup. But the recommended approach is to do it manually and disable the default behavior. Finally if you noticed, the game doesn’t redraw while resizing, we will make it such that it keeps drawing while resizing, which is the usually expected behavior.</p><h1>Toggle Fullscreen Mode</h1><p>We want to save the window position and style when entering fullscreen, so we can restore it.</p><pre><code class="zig"><span class="keyword">const</span> <span class="constant variable_builtin type variable">MyDirectXContext</span> <span class="operator">=</span> <span class="keyword_type">struct</span> <span class="punctuation_bracket">{</span>
+
+    <span class="comment_documentation comment spell">// ...</span>
+
+    <span class="constant variable_builtin type variable_member variable">is_fullscreen</span><span class="punctuation_delimiter">:</span> <span class="type_builtin">bool</span> <span class="operator">=</span> <span class="boolean">false</span><span class="punctuation_delimiter">,</span>
+    <span class="constant variable_builtin type variable_member variable">windowed_style</span><span class="punctuation_delimiter">:</span> <span class="type_builtin">u32</span> <span class="operator">=</span> <span class="number">0</span><span class="punctuation_delimiter">,</span> <span class="comment_documentation comment spell">// WS_OVERLAPPEDWINDOW etc,</span>
+    <span class="constant variable_builtin type variable_member variable">windowed_rect</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">RECT</span> <span class="operator">=</span> <span class="constant_builtin">undefined</span><span class="punctuation_delimiter">,</span>
+
+    <span class="keyword_function">fn</span> <span class="constant variable_builtin type variable function">toggleFullscreen</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">self</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">Self</span><span class="punctuation_bracket">)</span> <span class="type_builtin">void</span> <span class="punctuation_bracket">{</span>
+        <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">is_fullscreen</span><span class="punctuation_bracket">)</span> <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">leaveFullscreen</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span> <span class="keyword_conditional">else</span> <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">enterFullscreen</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span>
+
+    <span class="keyword_function">fn</span> <span class="constant variable_builtin type variable function">enterFullscreen</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">self</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">Self</span><span class="punctuation_bracket">)</span> <span class="type_builtin">void</span> <span class="punctuation_bracket">{</span>
+        <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">is_fullscreen</span><span class="punctuation_bracket">)</span> <span class="keyword_return">return</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windowed_style</span> <span class="operator">=</span> <span class="function_builtin">@intCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin function_call variable type">GetWindowLongPtrW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">GWL_STYLE</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetWindowRect</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="operator">&amp;</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windowed_rect</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+        <span class="keyword">const</span> <span class="constant variable_builtin type variable">mon</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">MonitorFromWindow</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">MONITOR_DEFAULTTONEAREST</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword">var</span> <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">MONITORINFO</span> <span class="operator">=</span> <span class="constant_builtin">undefined</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">cbSize</span> <span class="operator">=</span> <span class="function_builtin">@sizeOf</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">MONITORINFO</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetMonitorInfoW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">mon</span><span class="punctuation_delimiter">,</span> <span class="operator">&amp;</span><span class="constant variable_builtin type variable">mi</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword">const</span> <span class="module constant variable_builtin type variable">flags</span> <span class="operator">=</span> <span class="function_builtin keyword_import">@as</span><span class="punctuation_bracket">(</span><span class="type_builtin">u32</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@bitCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">WINDOW_STYLE</span><span class="punctuation_bracket">{</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">POPUP</span> <span class="operator">=</span> <span class="number">1</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">VISIBLE</span> <span class="operator">=</span> <span class="number">1</span> <span class="punctuation_bracket">}</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">SetWindowLongPtrW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">GWL_STYLE</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@as</span><span class="punctuation_bracket">(</span><span class="type_builtin">isize</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@intCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">flags</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+        <span class="keyword">const</span> <span class="constant variable_builtin type variable">w</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">right</span> <span class="operator">-</span> <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">left</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword">const</span> <span class="constant variable_builtin type variable">h</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">bottom</span> <span class="operator">-</span> <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">top</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">SetWindowPos</span><span class="punctuation_bracket">(</span>
+            <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">HWND_TOP</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">left</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">mi</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">rcMonitor</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">top</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">w</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">h</span><span class="punctuation_delimiter">,</span>
+            <span class="comment_documentation comment spell">//SWP_NOZORDER | SWP_FRAMECHANGED,</span>
+            <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">NOZORDER</span> <span class="operator">=</span> <span class="number">1</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">DRAWFRAME</span> <span class="operator">=</span> <span class="number">1</span> <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+        <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">is_fullscreen</span> <span class="operator">=</span> <span class="boolean">true</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span>
+
+    <span class="keyword_function">fn</span> <span class="constant variable_builtin type variable function">leaveFullscreen</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">self</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">Self</span><span class="punctuation_bracket">)</span> <span class="type_builtin">void</span> <span class="punctuation_bracket">{</span>
+        <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="operator">!</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">is_fullscreen</span><span class="punctuation_bracket">)</span> <span class="keyword_return">return</span><span class="punctuation_delimiter">;</span>
+
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">SetWindowLongPtrW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">GWL_STYLE</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windowed_style</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword">const</span> <span class="constant variable_builtin type variable">r</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windowed_rect</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">std</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">debug</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">print</span><span class="punctuation_bracket">(</span><span class="string">&quot;RECT {}&quot;</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span><span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">windowed_rect</span><span class="punctuation_bracket">}</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">SetWindowPos</span><span class="punctuation_bracket">(</span>
+            <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">hwnd</span><span class="punctuation_delimiter">,</span>
+            <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">left</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">top</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">right</span> <span class="operator">-</span> <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">left</span><span class="punctuation_delimiter">,</span>
+            <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">bottom</span> <span class="operator">-</span> <span class="constant variable_builtin type variable">r</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">top</span><span class="punctuation_delimiter">,</span>
+            <span class="punctuation_delimiter">.</span><span class="punctuation_bracket">{</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">NOZORDER</span> <span class="operator">=</span> <span class="number">1</span><span class="punctuation_delimiter">,</span> <span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">DRAWFRAME</span> <span class="operator">=</span> <span class="number">1</span> <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+
+        <span class="constant variable_builtin type variable">self</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">is_fullscreen</span> <span class="operator">=</span> <span class="boolean">false</span><span class="punctuation_delimiter">;</span>
+    <span class="punctuation_bracket">}</span>
+
+</code></pre>
+<p>Next, let’s disable the default behavior inside the <code>init</code> method:</p><pre><code class="zig">
+    <span class="keyword_function">fn</span> <span class="constant variable_builtin type variable">init</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin variable_parameter variable type">hwnd</span><span class="punctuation_delimiter">:</span> <span class="constant variable_builtin type variable">HWND</span><span class="punctuation_bracket">)</span> <span class="operator">!</span><span class="constant variable_builtin type variable">MyDirectXContext</span> <span class="punctuation_bracket">{</span>
+        <span class="comment_documentation comment spell">// ... create swap_chain first</span>
+
+        <span class="keyword">var</span> <span class="constant variable_builtin type variable">factory</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">IDXGIFactory</span> <span class="operator">=</span> <span class="constant_builtin">undefined</span><span class="punctuation_delimiter">;</span>
+        <span class="constant variable_builtin type variable">hr</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">swap_chain</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">IDXGIObject</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">GetParent</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">IID_IDXGIFactory</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@ptrCast</span><span class="punctuation_bracket">(</span><span class="operator">&amp;</span><span class="constant variable_builtin type variable">factory</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hr</span> <span class="operator">==</span> <span class="constant variable_builtin type variable">HRESULT</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">S_OK</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">factory</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">MakeWindowAssociation</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">DXGI_MWA_NO_ALT_ENTER</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin type variable">factory</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">IUnknown</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">Release</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span>
+
+</code></pre>
+<p>Finally let’s listen to <code>Alt+Enter</code> in <code>processWindowMessage</code>:</p><pre><code class="zig">    <span class="comment_documentation comment spell">//fn processWindowMessage(...)</span>
+        <span class="comment_documentation comment spell">// ...</span>
+        <span class="constant variable_builtin type variable">WM_SYSKEYDOWN</span> <span class="punctuation_delimiter">=&gt;</span> <span class="punctuation_bracket">{</span>
+            <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">wParam</span> <span class="operator">==</span> <span class="function_builtin">@intFromEnum</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">VK_RETURN</span><span class="punctuation_bracket">)</span> <span class="keyword_operator">and</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">lParam</span> <span class="operator">&amp;</span> <span class="punctuation_bracket">(</span><span class="number">1</span> <span class="operator">&lt;&lt;</span> <span class="number">29</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span> <span class="operator">!=</span> <span class="number">0</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span> <span class="comment_documentation comment spell">// bit 29 = ALT</span>
+                <span class="keyword">const</span> <span class="constant variable_builtin type variable">user_data</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetWindowLongPtrW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">GWLP_USERDATA</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">user_data</span> <span class="operator">==</span> <span class="number">0</span><span class="punctuation_bracket">)</span> <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword">const</span> <span class="module constant variable_builtin type variable">state</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">MyDirectXContext</span> <span class="operator">=</span> <span class="function_builtin keyword_import">@ptrFromInt</span><span class="punctuation_bracket">(</span><span class="function_builtin">@as</span><span class="punctuation_bracket">(</span><span class="type_builtin">usize</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@bitCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">user_data</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+                <span class="constant variable_builtin type variable">state</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">toggleFullscreen</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+            <span class="punctuation_bracket">}</span>
+
+            <span class="comment_documentation comment spell">// this might be useful to support Alt+F4</span>
+            <span class="keyword_return">return</span> DefWindowProcA<span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">msg</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">wParam</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">lParam</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="comment_documentation comment spell">//...</span>
+</code></pre>
+<p>Voilà! We have fullscreen support.</p><h2>Redraw while resizing</h2><p>To understand why we need an explicit draw while resizing take a look at our game loop:</p><pre><code class="zig">    <span class="keyword_repeat">while</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">running</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+        <span class="keyword_repeat">while</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin function_call variable type">PeekMessageA</span><span class="punctuation_bracket">(</span><span class="operator">&amp;</span><span class="constant variable_builtin type variable">msg</span><span class="punctuation_delimiter">,</span> <span class="constant_builtin">null</span><span class="punctuation_delimiter">,</span> <span class="number">0</span><span class="punctuation_delimiter">,</span> <span class="number">0</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">PM_REMOVE</span><span class="punctuation_bracket">)</span> <span class="operator">!=</span> <span class="number">0</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+            <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">msg</span><span class="punctuation_delimiter">.</span><span class="constant variable_builtin type variable_member variable">message</span> <span class="operator">==</span> <span class="constant variable_builtin type variable">WM_QUIT</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+                <span class="constant variable_builtin type variable">running</span> <span class="operator">=</span> <span class="boolean">false</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword_repeat">break</span><span class="punctuation_delimiter">;</span>
+            <span class="punctuation_bracket">}</span>
+
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">TranslateMessage</span><span class="punctuation_bracket">(</span><span class="operator">&amp;</span><span class="constant variable_builtin type variable">msg</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">DispatchMessageA</span><span class="punctuation_bracket">(</span><span class="operator">&amp;</span><span class="constant variable_builtin type variable">msg</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span>
+
+        <span class="comment_documentation comment spell">//...</span>
+
+        <span class="constant variable_builtin type variable">cx</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">draw</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+</code></pre>
+<p>This inner while loop is stuck while resizing keeps getting WM_SIZE events. It never breaks out of it to fall back to drawing.</p><p>We just have to draw inside <code>processWindowMessage</code> which happens on <code>DispatchMessageA</code> inside this inner loop.</p><pre><code class="zig">
+<span class="comment_documentation comment spell">// define this tag first</span>
+<span class="keyword">const</span> <span class="constant variable_builtin type variable">RESIZE_TIMER_ID</span> <span class="operator">=</span> <span class="number">1</span><span class="punctuation_delimiter">;</span>
+
+    <span class="comment_documentation comment spell">//fn processWindowMessage(...)</span>
+        <span class="comment_documentation comment spell">//...</span>
+        <span class="constant variable_builtin type variable">WM_ENTERSIZEMOVE</span> <span class="punctuation_delimiter">=&gt;</span> <span class="punctuation_bracket">{</span>
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">SetTimer</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">RESIZE_TIMER_ID</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">USER_TIMER_MINIMUM</span><span class="punctuation_delimiter">,</span> <span class="constant_builtin">null</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+            <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">WM_EXITSIZEMOVE</span> <span class="punctuation_delimiter">=&gt;</span> <span class="punctuation_bracket">{</span>
+            <span class="constant variable_builtin type variable">_</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">KillTimer</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">RESIZE_TIMER_ID</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+            <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="constant variable_builtin type variable">WM_TIMER</span> <span class="punctuation_delimiter">=&gt;</span> <span class="punctuation_bracket">{</span>
+            <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">wParam</span> <span class="operator">==</span> <span class="constant variable_builtin type variable">RESIZE_TIMER_ID</span><span class="punctuation_bracket">)</span> <span class="punctuation_bracket">{</span>
+                <span class="keyword">const</span> <span class="constant variable_builtin type variable">user_data</span> <span class="operator">=</span> <span class="constant variable_builtin function_call variable type">GetWindowLongPtrW</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">hwnd</span><span class="punctuation_delimiter">,</span> <span class="constant variable_builtin type variable">GWLP_USERDATA</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword_conditional">if</span> <span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">user_data</span> <span class="operator">==</span> <span class="number">0</span><span class="punctuation_bracket">)</span> <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+                <span class="keyword">const</span> <span class="module constant variable_builtin type variable">state</span><span class="punctuation_delimiter">:</span> <span class="operator">*</span><span class="constant variable_builtin type variable">MyDirectXContext</span> <span class="operator">=</span> <span class="function_builtin keyword_import">@ptrFromInt</span><span class="punctuation_bracket">(</span><span class="function_builtin">@as</span><span class="punctuation_bracket">(</span><span class="type_builtin">usize</span><span class="punctuation_delimiter">,</span> <span class="function_builtin">@bitCast</span><span class="punctuation_bracket">(</span><span class="constant variable_builtin type variable">user_data</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span>
+                <span class="constant variable_builtin type variable">state</span><span class="punctuation_delimiter">.</span><span class="type constant variable_builtin function_call variable_member variable">draw</span><span class="punctuation_bracket">(</span><span class="punctuation_bracket">)</span><span class="punctuation_delimiter">;</span> <span class="comment_documentation comment spell">// resize buffers already happened in WM_SIZE</span>
+            <span class="punctuation_bracket">}</span>
+            <span class="keyword_return">return</span> <span class="number">0</span><span class="punctuation_delimiter">;</span>
+        <span class="punctuation_bracket">}</span><span class="punctuation_delimiter">,</span>
+        <span class="comment_documentation comment spell">//...</span>
+</code></pre>
+</div>
+	<div id="prev-next">
+		<div>
+			<a href="/blog/resizable-pixel-perfect-render-target/">
+				←
+				<span>Fixed Resolution Responsive Game View for Resizable Window</span>
+			</a>
+		</div>
+		<div></div>
+	</div>
+
+		<footer>
+			<hr>
+			<a href="/about/">Project Zigfall</a>
+		</footer>
+	</body>
+</html>
