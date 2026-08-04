@@ -631,3 +631,18 @@ Finally the triangle rendered half the game area, instead of covering the entire
         .Width = game_width,
         .Height = game_height,
 ```
+
+
+**Correction:** I actually showed you the fractional scaling first which I intent to keep, but here's what the integer scaling would look like:
+
+```zig
+        const scale_x = @divTrunc(win_w, @as(i32, @intCast(game_width)));
+        const scale_y = @divTrunc(win_h, @as(i32, @intCast(game_height)));
+        const scale = @max(1, @min(scale_x, scale_y));
+
+        const out_w = @as(i32, @intCast(game_width)) * scale;
+        const out_h = @as(i32, @intCast(game_height)) * scale;
+
+        const offset_x = @divTrunc(win_w - out_w, 2);
+        const offset_y = @divTrunc(win_h - out_h, 2);
+```
