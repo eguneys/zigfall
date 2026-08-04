@@ -1,0 +1,168 @@
+---
+.title = "Fullscreen Mode and Draw while Resizing",
+.date = .date("2026-08-04T18:39:00"),
+.layout = "post.shtml",
+---
+
+We want to toggle Fullscreen Mode when user presses Alt+Enter. This is possible in 2 different ways, and I realized DirectX supports this out of the box when you create a default setup.
+But the recommended approach is to do it manually and disable the default behavior.
+Finally if you noticed, the game doesn't redraw while resizing, we will make it such that it keeps drawing while resizing, which is the usually expected behavior.
+
+
+# Toggle Fullscreen Mode
+
+We want to save the window position and style when entering fullscreen, so we can restore it.
+
+```zig
+const MyDirectXContext = struct {
+
+    // ...
+
+    is_fullscreen: bool = false,
+    windowed_style: u32 = 0, // WS_OVERLAPPEDWINDOW etc,
+    windowed_rect: RECT = undefined,
+
+    fn toggleFullscreen(self: *Self) void {
+        if (self.is_fullscreen) self.leaveFullscreen() else self.enterFullscreen();
+    }
+
+    fn enterFullscreen(self: *Self) void {
+        if (self.is_fullscreen) return;
+        self.windowed_style = @intCast(GetWindowLongPtrW(self.hwnd, GWL_STYLE));
+        _ = GetWindowRect(self.hwnd, &self.windowed_rect);
+
+        const mon = MonitorFromWindow(self.hwnd, MONITOR_DEFAULTTONEAREST);
+        var mi: MONITORINFO = undefined;
+        mi.cbSize = @sizeOf(MONITORINFO);
+        _ = GetMonitorInfoW(mon, &mi);
+        const flags = @as(u32, @bitCast(WINDOW_STYLE{ .POPUP = 1, .VISIBLE = 1 }));
+        _ = SetWindowLongPtrW(self.hwnd, GWL_STYLE, @as(isize, @intCast(flags)));
+
+        const w = mi.rcMonitor.right - mi.rcMonitor.left;
+        const h = mi.rcMonitor.bottom - mi.rcMonitor.top;
+        _ = SetWindowPos(
+            self.hwnd,
+            HWND_TOP,
+            mi.rcMonitor.left,
+            mi.rcMonitor.top,
+            w,
+            h,
+            //SWP_NOZORDER | SWP_FRAMECHANGED,
+            .{ .NOZORDER = 1, .DRAWFRAME = 1 },
+        );
+
+        self.is_fullscreen = true;
+    }
+
+    fn leaveFullscreen(self: *Self) void {
+        if (!self.is_fullscreen) return;
+
+        _ = SetWindowLongPtrW(self.hwnd, GWL_STYLE, self.windowed_style);
+        const r = self.windowed_rect;
+        std.debug.print("RECT {}", .{self.windowed_rect});
+        _ = SetWindowPos(
+            self.hwnd,
+            null,
+            r.left,
+            r.top,
+            r.right - r.left,
+            r.bottom - r.top,
+            .{ .NOZORDER = 1, .DRAWFRAME = 1 },
+        );
+
+        self.is_fullscreen = false;
+    }
+
+```
+
+Next, let's disable the default behavior inside the `init` method:
+
+```zig
+
+    fn init(hwnd: HWND) !MyDirectXContext {
+        // ... create swap_chain first
+
+        var factory: *IDXGIFactory = undefined;
+        hr = swap_chain.IDXGIObject.GetParent(IID_IDXGIFactory, @ptrCast(&factory));
+        if (hr == HRESULT.S_OK) {
+            _ = factory.MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+            _ = factory.IUnknown.Release();
+        }
+
+```
+
+Finally let's listen to `Alt+Enter` in `processWindowMessage`:
+
+```zig
+    //fn processWindowMessage(...)
+        // ...
+        WM_SYSKEYDOWN => {
+            if (wParam == @intFromEnum(VK_RETURN) and (lParam & (1 << 29)) != 0) { // bit 29 = ALT
+                const user_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+                if (user_data == 0) return 0;
+                const state: *MyDirectXContext = @ptrFromInt(@as(usize, @bitCast(user_data)));
+                state.toggleFullscreen();
+                return 0;
+            }
+
+            // this might be useful to support Alt+F4
+            return DefWindowProcA(hwnd, msg, wParam, lParam);
+        },
+        //...
+```
+
+
+Voilà! We have fullscreen support.
+
+
+## Redraw while resizing
+
+To understand why we need an explicit draw while resizing take a look at our game loop:
+
+```zig
+    while (running) {
+        while (PeekMessageA(&msg, null, 0, 0, PM_REMOVE) != 0) {
+            if (msg.message == WM_QUIT) {
+                running = false;
+                break;
+            }
+
+            _ = TranslateMessage(&msg);
+            _ = DispatchMessageA(&msg);
+        }
+
+        //...
+
+        cx.draw();
+```
+
+This inner while loop is stuck while resizing keeps getting WM_SIZE events. It never breaks out of it to fall back to drawing.
+
+We just have to draw inside `processWindowMessage` which happens on `DispatchMessageA` inside this inner loop.
+
+```zig
+
+// define this tag first
+const RESIZE_TIMER_ID = 1;
+
+    //fn processWindowMessage(...)
+        //...
+        WM_ENTERSIZEMOVE => {
+            _ = SetTimer(hwnd, RESIZE_TIMER_ID, USER_TIMER_MINIMUM, null);
+            return 0;
+        },
+        WM_EXITSIZEMOVE => {
+            _ = KillTimer(hwnd, RESIZE_TIMER_ID);
+            return 0;
+        },
+        WM_TIMER => {
+            if (wParam == RESIZE_TIMER_ID) {
+                const user_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+                if (user_data == 0) return 0;
+                const state: *MyDirectXContext = @ptrFromInt(@as(usize, @bitCast(user_data)));
+                state.draw(); // resize buffers already happened in WM_SIZE
+            }
+            return 0;
+        },
+        //...
+```
