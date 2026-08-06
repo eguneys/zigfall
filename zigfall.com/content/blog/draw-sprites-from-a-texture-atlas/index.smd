@@ -229,7 +229,99 @@ One additional note is `drawSprite` accepts `textureWidth` and `textureHeight` a
 
 I leave it as a homework to wire this up yourself. For the solution you can take a look at [v0.2.0](https://github.com/eguneys/monsden/tree/v0.2.0).
 
-Try to draw lots of sprites to test if the batched rendering really works, Enjoy.
+Try to draw lots of sprites to test if the batched rendering really works.
+
+## MyTexture struct for some organization and generic abstractions
+
+I reorganized the code a bit at this point, I will show you 2 helper structs which gets used, it is left as a homework to adjust it to your needs:
+
+This is what the `MyWicFactory` returns now for decoded PGN image data:
+
+```zig
+pub const RGBAImage = struct { buf: []u8, width: u32, height: u32 };
+```
+
+This is Texture data along with the texture size:
+
+```zig
+const MyTexture = struct {
+    Width: u32,
+    Height: u32,
+    Srv: *ID3D11ShaderResourceView,
+
+    pub fn deinit(self: *MyTexture) void {
+        _ = self.Srv.IUnknown.Release();
+    }
+};
+```
+
+Finally wiring helper struct:
+
+```zig
+
+const MyTextureResources = struct {
+    texSprites: MyTexture,
+    texBackground: MyTexture,
+
+    const Self = @This();
+
+    fn deinit(self: *Self) void {
+        self.texSprites.deinit();
+        self.texBackground.deinit();
+    }
+
+    fn init(io: std.Io, allocator: Allocator, cx: *MyDirectXContext) !Self {
+        var mywic_factory = try png.MyWicFactory.init();
+        defer mywic_factory.deinit();
+
+        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        const exePath = try MyAssetsPathLocator.executableDirPath(io, &buf);
+
+        const spritesPngPath = try MyAssetsPathLocator.PngPath(allocator, exePath, "sprites.png");
+        defer allocator.free(spritesPngPath);
+
+        const bgPngPath = try MyAssetsPathLocator.PngPath(allocator, exePath, "background.png");
+        defer allocator.free(bgPngPath);
+
+        const spritesPngU16 = try MyAssetsPathLocator.convertToU16WindowsPath(allocator, spritesPngPath);
+        defer allocator.free(spritesPngU16);
+
+        const bgPngU16 = try MyAssetsPathLocator.convertToU16WindowsPath(allocator, bgPngPath);
+        defer allocator.free(bgPngU16);
+
+        var pngBuf: [1024 * 300 * 1]u8 = undefined;
+        const spritesRGBA = try mywic_factory.png(spritesPngU16, &pngBuf);
+
+        var pngBuf2: [1024 * 100 * 1]u8 = undefined;
+        const bgRGBA = try mywic_factory.png(bgPngU16, &pngBuf2);
+
+        return .{
+            .texSprites = try cx.CreateMyTexture(spritesRGBA),
+            .texBackground = try cx.CreateMyTexture(bgRGBA),
+        };
+    }
+};
+```
+
+There is more code moved around for organization, I suggest looking at the code examples *(especially the MyBatchDraw struct)* for this section at
+[v0.2.1](https://github.com/eguneys/monsden/tree/v0.2.1).
+
+I will leave you with this Api signature:
+
+    fn drawSprite(self: *Self, texture: *MyTexture, source_rect: Rect, dest_rect: Rect) void {
+
+and this helper method both residing in `MyBatchDraw`:
+
+```zig
+    current_texture: ?*MyTexture = null,
+
+    fn SetShaderResourceForTexture(self: *Self, texture: MyTexture) void {
+        var raw_srv = [_]?*ID3D11ShaderResourceView{texture.Srv};
+        const srvs: ?[*]?*ID3D11ShaderResourceView = &raw_srv;
+        self.context.PSSetShaderResources(0, 1, srvs);
+    }
+```
+
 
 ## Transparency with Alpha Blending
 
