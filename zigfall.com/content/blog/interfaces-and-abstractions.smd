@@ -1,0 +1,101 @@
+---
+.title = "Interfaces in Zig and Platform Abstractions",
+.date = .date("2026-08-06T15:23:00"),
+.layout = "post.shtml",
+---
+
+I've moved code around again, in order to abstract away the platform layer, and work on top of higher level abstractions.
+You can reach this version of the code at [v0.3.0](https://github.com/eguneys/monsden/tree/v0.3.0).
+
+I will quickly show you an example of how an interface is used in Zig, and end this post.
+
+
+This is the **SpriteBatch Interface**.
+```zig
+pub const SpriteBatch = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        drawSprite: *const fn (ctx: *anyopaque, source_rect: Rect, dest_rect: Rect) void,
+        drawBg: *const fn (ctx: *anyopaque, source_rect: Rect, dest_rect: Rect) void,
+    };
+
+    const Self = @This();
+    pub fn draw_spr(self: Self, sx: f32, sy: f32, sw: f32, sh: f32, dx: f32, dy: f32, scale_x: f32, scale_y: f32) void {
+        const source_rect: Rect = .{ .x = sx, .y = sy, .width = sw, .height = sh };
+        const dest_rect: Rect = .{ .x = dx, .y = dy, .width = sw * scale_x, .height = sh * scale_y };
+        self.vtable.drawSprite(self.ptr, source_rect, dest_rect);
+    }
+    pub fn draw_bg(self: Self, sx: f32, sy: f32, sw: f32, sh: f32, dx: f32, dy: f32, scale_x: f32, scale_y: f32) void {
+        const source_rect: Rect = .{ .x = sx, .y = sy, .width = sw, .height = sh };
+        const dest_rect: Rect = .{ .x = dx, .y = dy, .width = sw * scale_x, .height = sh * scale_y };
+        self.vtable.drawBg(self.ptr, source_rect, dest_rect);
+    }
+};
+```
+
+
+This is the platform specific implementation:
+
+```zig
+pub const MySpriteBatch = struct {
+    const Self = @This();
+
+    platform: MyPlatform,
+
+    fn drawSpriteImpl(ctx: *anyopaque, source_rect: Rect, dest_rect: Rect) void {
+        const self: *Self = @ptrCast(@alignCast(ctx));
+
+        self.platform.batch.drawSprite(&self.platform.resources.texSprites, source_rect, dest_rect) catch unreachable;
+    }
+    fn drawBgImpl(ctx: *anyopaque, source_rect: Rect, dest_rect: Rect) void {
+        const self: *Self = @ptrCast(@alignCast(ctx));
+
+        self.platform.batch.drawSprite(&self.platform.resources.texBackground, source_rect, dest_rect) catch unreachable;
+    }
+
+    const vtable = SpriteBatch.VTable{
+        .drawSprite = drawSpriteImpl,
+        .drawBg = drawBgImpl,
+    };
+
+    pub fn spriteBatch(self: *Self) SpriteBatch {
+        return .{
+            .ptr = self,
+            .vtable = &vtable,
+        };
+    }
+};
+```
+
+Just be careful playing with pointers, they are the main source of segmentation faults that can be tricky to debug.
+
+
+I will leave you with the **Scene abstraction**, to give you gist of what our higher level work revolves around:
+
+```zig
+
+pub const Scene = struct {
+    batch: SpriteBatch,
+
+    const Self = @This();
+    pub fn init(batch: SpriteBatch) Self {
+        return .{ .batch = batch };
+    }
+
+    pub fn update(self: *Self, dt: f32) void {
+        _ = self;
+        _ = dt;
+    }
+
+    pub fn render(self: *Self) void {
+        self.batch.draw_bg(0, 0, 100, 100, 5, 5, 20, 20);
+
+        self.batch.draw_spr(0, 0, 32, 32, 50, 50, 2, 2);
+        self.batch.draw_spr(0, 0, 32, 32, 0, 50, 2, 2);
+        self.batch.draw_spr(0, 0, 32, 32, 150, 50, 2, 2);
+        self.batch.draw_spr(0, 0, 32, 32, 250, 50, 2, 2);
+    }
+};
+```
