@@ -5,7 +5,7 @@
     <description>Welcome to ZigFall! - Blog</description>
     <generator>Zine -- https://zine-ssg.io</generator>
     <language>en-US</language>
-    <lastBuildDate>Thu, 06 Aug 2026 00:57:14 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 06 Aug 2026 02:38:31 +0000</lastBuildDate>
     
       <item>
         <title>Draw Sprites From a Texture Atlas And Batched Rendering</title>
@@ -166,7 +166,7 @@
     &lt;span class=&quot;punctuation_bracket&quot;&gt;}&lt;/span&gt;
 &lt;span class=&quot;punctuation_bracket&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;punctuation_delimiter&quot;&gt;;&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
-&lt;p&gt;One additional note is &lt;code&gt;drawSprite&lt;/code&gt; accepts &lt;code&gt;textureWidth&lt;/code&gt; and &lt;code&gt;textureHeight&lt;/code&gt; along with the &lt;code&gt;ID3D11ShaderResourceView&lt;/code&gt; that contains the texture, this could be made it’s struct where the texture size is cached. But we will keep it explicit for now.&lt;/p&gt;&lt;p&gt;I leave it as a homework to wire this up yourself. For the solution you can take a look at &lt;a href=&quot;https://github.com/eguneys/monsden/tree/v0.2.0&quot;&gt;v.0.2.0&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Try to draw lots of sprites to test if the batched rendering really works, Enjoy.&lt;/p&gt;</description>
+&lt;p&gt;One additional note is &lt;code&gt;drawSprite&lt;/code&gt; accepts &lt;code&gt;textureWidth&lt;/code&gt; and &lt;code&gt;textureHeight&lt;/code&gt; along with the &lt;code&gt;ID3D11ShaderResourceView&lt;/code&gt; that contains the texture, this could be made it’s struct where the texture size is cached. But we will keep it explicit for now.&lt;/p&gt;&lt;p&gt;I leave it as a homework to wire this up yourself. For the solution you can take a look at &lt;a href=&quot;https://github.com/eguneys/monsden/tree/v0.2.0&quot;&gt;v0.2.0&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Try to draw lots of sprites to test if the batched rendering really works, Enjoy.&lt;/p&gt;&lt;h2&gt;Transparency with Alpha Blending&lt;/h2&gt;&lt;p&gt;Your second homework is to workout alpha blending, Again for the solution take a look at &lt;a href=&quot;https://github.com/eguneys/monsden/tree/v0.2.2&quot;&gt;v0.2.2&lt;/a&gt;.&lt;/p&gt;</description>
         <link>https://zigfall.com/blog/draw-sprites-from-a-texture-atlas/</link>
         <pubDate>Wed, 05 Aug 2026 18:58:00 +0000</pubDate>
         <guid>https://zigfall.com/blog/draw-sprites-from-a-texture-atlas/</guid>
