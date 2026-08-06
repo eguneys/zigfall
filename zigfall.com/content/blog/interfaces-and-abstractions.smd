@@ -7,7 +7,7 @@
 I've moved code around again, in order to abstract away the platform layer, and work on top of higher level abstractions.
 You can reach this version of the code at [v0.3.0](https://github.com/eguneys/monsden/tree/v0.3.0).
 
-I will quickly show you an example of how an interface is used in Zig, and end this post.
+Here is an example of how an interface is used in Zig:
 
 
 This is the **SpriteBatch Interface**.
@@ -72,7 +72,7 @@ pub const MySpriteBatch = struct {
 Just be careful playing with pointers, they are the main source of segmentation faults that can be tricky to debug.
 
 
-I will leave you with the **Scene abstraction**, to give you gist of what our higher level work revolves around:
+This is an old **Scene abstraction**, I classically wrote, but this is **not** how I will structure my code.
 
 ```zig
 
@@ -81,6 +81,7 @@ pub const Scene = struct {
 
     const Self = @This();
     pub fn init(batch: SpriteBatch) Self {
+
         return .{ .batch = batch };
     }
 
@@ -99,3 +100,88 @@ pub const Scene = struct {
     }
 };
 ```
+
+The problem is scene should not hold a SpriteBatch, and update and render functions should be outside of the Scene. More like this:
+
+```zig
+pub const Scene = struct {
+    animation: anim.FramesAnimation,
+
+    const Self = @This();
+    pub fn init() Self {
+        const source_rect: math.Box = .init(0, 0, 32, 32);
+        const dest_rect: math.Box = .init(0, 0, 64, 64);
+        const frames = &[_]u8{ 0, 1, 2, 3, 4 };
+        return .{ .animation = .init(7.2, frames, source_rect, dest_rect) };
+    }
+};
+
+pub fn renderScene(batch: SpriteBatch, scene: *Scene, alpha: f32) void {
+    _ = alpha;
+    batch.draw_bg(0, 0, 64, 64, 5, 5, 10, 10);
+    batch.draw_spr(0, 0, 32, 32, 0, 0, 2, 2);
+    scene.animation.dest.x = 0;
+    scene.animation.dest.y = 0;
+    anim.renderFramesAnimation(batch, &scene.animation);
+    {
+        const i = 1;
+        scene.animation.dest.x = @floatFromInt(i % 30 * 30);
+        scene.animation.dest.y = @floatFromInt(i / 30 * 30);
+        anim.renderFramesAnimation(batch, &scene.animation);
+    }
+
+    //for (0..1000) |i| {
+    //    scene.animation.dest.x = @floatFromInt(i % 30 * 30);
+    //    scene.animation.dest.y = @floatFromInt(i / 30 * 30);
+    //    //anim.renderFramesAnimation(batch, &scene.animation);
+    //}
+}
+
+pub fn updateScene(scene: *Scene, dt: f64) void {
+    anim.updateFramesAnimation(&scene.animation, dt);
+}
+```
+
+# Fix One bug in the Sprite Batch Renderer
+
+I have noticed some flickering after minimizing and restoring the window, through some iterations I think I found the culprit.
+Recall `MyBatchDraw` flush method looks like this:
+
+```zig
+    fn flush(self: *Self) !void {
+        if (self.sprite_count == 0) return;
+
+        self.SetShaderResourceForTexture(self.current_texture.?);
+
+        self.context.Unmap(@ptrCast(self.vertex_buffer), 0);
+
+        self.context.DrawIndexed(self.sprite_count * 6, 0, 0);
+
+        const hr = self.context.Map(
+            @ptrCast(self.vertex_buffer),
+            0,
+            //D3D11_MAP_WRITE_NO_OVERWRITE,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &self.mapped,
+        );
+        if (hr != HRESULT.S_OK) return error.MapFailed;
+        self.sprite_count = 0;
+    }
+```
+
+So I Looked at it with `DebugView.exe` and found this DirectX Error that reads like this: *draw cannot be invoked while a bound resource is currently mapped*.
+
+Turns out after the final flush, we hold on to the final Map as you can see above. This lead to corruption and flickering.
+
+The fix was to write an `endBatch` method and call it at the end of the batch drawing.
+
+```zig
+    fn endBatch(self: *Self) !void {
+        try self.flush();
+
+        self.context.Unmap(@ptrCast(self.vertex_buffer), 0);
+    }
+```
+
+As always you can reach this version of the code at [v0.3.1](https://github.com/eguneys/monsden/tree/v0.3.1). Have a nice day.
