@@ -1,0 +1,232 @@
+---
+.title = "Draw Sprites From a Texture Atlas And Batched Rendering",
+.date = .date("2026-08-05T18:58:00"),
+.layout = "post.shtml",
+---
+
+In our previous post we rendered the entire PNG file onto the entire game area.
+In this part, we will start with drawing a sub section of the atlas onto a section of the game area.
+
+Let's get started!
+
+# Render Source Rect from a Texture onto Destination Rect of the Game Area
+
+
+We will be writing this method: 
+
+`fn drawSprite(self: *Self, source_rect: Rect, dest_rect: Rect) void {`
+
+so that we can draw a `source_rect` section of the texture, onto `dest_rect` section of the game area.
+
+First let's define the `Rect` struct:
+
+```zig
+pub const Rect = struct {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+};
+```
+
+and `drawSprite` looks like this:
+
+```zig
+    fn drawSprite(self: *Self, source_rect: Rect, dest_rect: Rect) void {
+        const atlas_tex_desc = self.atlas_tex_desc;
+
+        // compute u0, v0, u1, v1, and ndc_x0..ndc_y1 as above
+
+        // source rect
+        const _u0 = source_rect.x / @as(f32, @floatFromInt(atlas_tex_desc.Width));
+        const v0 = source_rect.y / @as(f32, @floatFromInt(atlas_tex_desc.Height));
+        const _u1 = (source_rect.x + source_rect.width) / @as(f32, @floatFromInt(atlas_tex_desc.Width));
+        const v1 = (source_rect.y + source_rect.height) / @as(f32, @floatFromInt(atlas_tex_desc.Height));
+
+        //dest rect
+        const ndc_x0 = (dest_rect.x / game_width) * 2.0 - 1.0;
+        const ndc_y0 = 1.0 - (dest_rect.y / game_height) * 2.0; // y flips
+        const ndc_x1 = ((dest_rect.x + dest_rect.width) / game_width) * 2.0 - 1.0;
+        const ndc_y1 = 1.0 - ((dest_rect.y + dest_rect.height) / game_height) * 2.0;
+
+        const quad_vertices = [_]Vertex{
+            .{ .pos = .{ ndc_x0, ndc_y0, 0.0 }, .uv = .{ _u0, v0 } }, // top-left
+            .{ .pos = .{ ndc_x1, ndc_y0, 0.0 }, .uv = .{ _u1, v0 } }, //top-right
+            .{ .pos = .{ ndc_x1, ndc_y1, 0.0 }, .uv = .{ _u1, v1 } }, //bottom-right
+            .{ .pos = .{ ndc_x0, ndc_y1, 0.0 }, .uv = .{ _u0, v1 } }, //bottom-left
+        };
+
+        // Map -> write 4 vert -> Unmap
+        var mapped: D3D11_MAPPED_SUBRESOURCE = undefined;
+        _ = self.context.Map(@ptrCast(self.vertex_buffer), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        const dst: [*]Vertex = @ptrCast(@alignCast(mapped.pData));
+        @memcpy(dst[0..4], &quad_vertices);
+        self.context.Unmap(@ptrCast(self.vertex_buffer), 0);
+        self.context.DrawIndexed(6, 0, 0);
+    }
+```
+
+Essentially we are calculating the new `quad_vertices` that holds all the information to draw a sprite and writing it to the GPU with some `Map`, `Unmap` style.
+
+There is some state tweaks we need to adjust to make this work:
+
+D3D11_BUFFER_DESC for the `vertex_buffer` needs to be updated to make it dynamically write-able from the cpu:
+
+```zig
+  var buffer_desc = D3D11_BUFFER_DESC{
+            .ByteWidth = @sizeOf(@TypeOf(vertices)),
+            //.Usage = D3D11_USAGE_IMMUTABLE,
+            .Usage = D3D11_USAGE_DYNAMIC,
+            .BindFlags = D3D11_BIND_VERTEX_BUFFER,
+            .CPUAccessFlags = .{ .WRITE = 1 },
+            .MiscFlags = .{},
+            .StructureByteStride = 0,
+        };
+```
+
+Also put this field on our `MyDirectXContext` struct so you can reference it from `drawSprite`:
+
+```
+    atlas_tex_desc: D3D11_TEXTURE2D_DESC,
+```
+
+
+Finally call `drawSprite` from main draw method  like this:
+
+```zig
+
+    // In Pass 1:
+
+        // replace this with below
+        //self.context.DrawIndexed(6, 0, 0);
+
+        var src_rect = Rect{ .x = 0, .y = 0, .width = 160, .height = 160 };
+        var dst_rect = Rect{ .x = 10, .y = 10, .width = 620, .height = 340 };
+        self.drawSprite(src_rect, dst_rect);
+
+        src_rect = Rect{ .x = 0, .y = 0, .width = 100, .height = 100 };
+        dst_rect = Rect{ .x = 100, .y = 100, .width = 100, .height = 300 };
+        self.drawSprite(src_rect, dst_rect);
+
+```
+
+So that's how we can draw arbitrary sprites in our program. Next we will streamline this with Batched Rendering with a reasonable API.
+
+## 2D Batched Rendering
+
+### A static precomputed index buffer for the whole batch
+
+The index pattern never changes, so we generate it once for `MAX_SPRITES_PER_BATCH` and upload it as `IMMUTABLE`:
+
+```zig
+    var indices: [MAX_SPRITES_PER_BATCH * 6]u16 = undefined;
+    for (0..MAX_SPRITES_PER_BATCH) |i| {
+        const v: u16 = @intCast(i * 4);
+        const base = i * 6;
+        indices[base..][0..6].* = .{ v + 0, v + 1, v + 2, v + 0, v + 2, v + 3 };
+    }
+```
+
+### One big `DYNAMIC` vertex buffer
+
+Update the `DESCRIPTION` for the vertex buffer:
+
+```zig
+   .ByteWidth = @sizeOf(Vertex) * 4 * MAX_SPRITES_PER_BATCH,
+```
+
+
+## A helper struct for Batched Drawing
+
+
+
+```zig
+const MyBatchDraw = struct {
+    context: *ID3D11DeviceContext,
+    vertex_buffer: *ID3D11Buffer,
+
+    current_texture: ?*ID3D11ShaderResourceView = null,
+    sprite_count: u32 = 0,
+    mapped: D3D11_MAPPED_SUBRESOURCE = undefined,
+
+    fn init(context: *ID3D11DeviceContext, vertex_buffer: *ID3D11Buffer) Self {
+        return .{ .context = context, .vertex_buffer = vertex_buffer };
+    }
+
+    const Self = @This();
+    fn beginBatch(self: *Self) !void {
+        const hr = self.context.Map(
+            @ptrCast(self.vertex_buffer),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &self.mapped,
+        );
+        if (hr != HRESULT.S_OK) return error.MapFailed;
+        self.sprite_count = 0;
+        self.current_texture = null;
+    }
+
+    fn flush(self: *Self) void {
+        if (self.sprite_count == 0) return;
+        self.context.Unmap(@ptrCast(self.vertex_buffer), 0);
+
+        var raw_srv = [_]?*ID3D11ShaderResourceView{self.current_texture};
+        const atlas_srvs: ?[*]?*ID3D11ShaderResourceView = &raw_srv;
+        self.context.PSSetShaderResources(0, 1, atlas_srvs);
+        self.context.DrawIndexed(self.sprite_count * 6, 0, 0);
+
+        _ = self.context.Map(
+            @ptrCast(self.vertex_buffer),
+            0,
+            //D3D11_MAP_WRITE_NO_OVERWRITE,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &self.mapped,
+        );
+        self.sprite_count = 0;
+    }
+
+    fn drawSprite(self: *Self, srv: *ID3D11ShaderResourceView, textureWidth: u32, textureHeight: u32, source_rect: Rect, dest_rect: Rect) void {
+        if (self.sprite_count == MAX_SPRITES_PER_BATCH) {
+            self.flush();
+        }
+        if (self.current_texture != null and self.current_texture.? != srv) {
+            self.flush();
+        }
+        self.current_texture = srv;
+
+        const dst: [*]Vertex = @ptrCast(@alignCast(self.mapped.pData));
+
+        // source rect
+        const _u0 = source_rect.x / @as(f32, @floatFromInt(textureWidth));
+        const v0 = source_rect.y / @as(f32, @floatFromInt(textureHeight));
+        const _u1 = (source_rect.x + source_rect.width) / @as(f32, @floatFromInt(textureWidth));
+        const v1 = (source_rect.y + source_rect.height) / @as(f32, @floatFromInt(textureHeight));
+
+        //dest rect
+        const ndc_x0 = (dest_rect.x / game_width) * 2.0 - 1.0;
+        const ndc_y0 = 1.0 - (dest_rect.y / game_height) * 2.0; // y flips
+        const ndc_x1 = ((dest_rect.x + dest_rect.width) / game_width) * 2.0 - 1.0;
+        const ndc_y1 = 1.0 - ((dest_rect.y + dest_rect.height) / game_height) * 2.0;
+
+        const quad_vertices = [_]Vertex{
+            .{ .pos = .{ ndc_x0, ndc_y0, 0.0 }, .uv = .{ _u0, v0 } }, // top-left
+            .{ .pos = .{ ndc_x1, ndc_y0, 0.0 }, .uv = .{ _u1, v0 } }, //top-right
+            .{ .pos = .{ ndc_x1, ndc_y1, 0.0 }, .uv = .{ _u1, v1 } }, //bottom-right
+            .{ .pos = .{ ndc_x0, ndc_y1, 0.0 }, .uv = .{ _u0, v1 } }, //bottom-left
+        };
+
+        @memcpy(dst[self.sprite_count * 4 .. self.sprite_count * 4 + 4], &quad_vertices);
+
+        self.sprite_count += 1;
+    }
+};
+```
+
+One additional note is `drawSprite` accepts `textureWidth` and `textureHeight` along with the `ID3D11ShaderResourceView` that contains the texture, this could be made it's struct where the texture size is cached. But we will keep it explicit for now.
+
+
+I leave it as a homework to wire this up yourself. For the solution you can take a look at [v.0.2.0](https://github.com/eguneys/monsden/tree/v0.2.0).
+
+Try to draw lots of sprites to test if the batched rendering really works, Enjoy.
