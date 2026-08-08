@@ -1,0 +1,204 @@
+---
+.title = "Watching file changes and handling keyboard input",
+.date = .date("2026-08-07T21:41:00"),
+.layout = "post.shtml",
+---
+
+At this point, we can render stuff and handle the window events successfully. Now I want to move on to platform independent actual game play code, and work on some movement. 
+But first, Zig has a `--watch` option when you run `zig build run --watch`, It watches the source files and reruns your application on success.
+
+Except windows doesn't trigger a reload probably because some windows issue. But if you close the window, only then it can reload the new updated window.
+
+So I figured we can bind the key `Q` to quit the application so it reloads the new window. So our workflow will be 
+
+* Change the source code
+* Press Q to close the old window
+* If the build was successfull the new window will reload
+* If the build fails, it will reload the new window as soon as the first successful build happens.
+
+
+# Handling the Keyboard Events
+
+First some keyboard state handling code:
+
+```zig
+pub const KeyboardState = struct {
+    current: [256]bool = [_]bool{false} ** 256,
+    previous: [256]bool = [_]bool{false} ** 256,
+
+    pub fn init() KeyboardState {
+        return .{};
+    }
+
+    pub fn snapshot(self: *KeyboardState) void {
+        self.previous = self.current;
+    }
+
+    pub fn killFocus(self: *KeyboardState) void {
+        self.current = [_]bool{false} ** 256;
+    }
+
+    pub fn justPressed(self: *const KeyboardState, vk: usize) bool {
+        return self.current[vk] and !self.previous[vk];
+    }
+    pub fn justReleased(self: *const KeyboardState, vk: usize) bool {
+        return !self.current[vk] and self.previous[vk];
+    }
+    pub fn isHeld(self: *const KeyboardState, vk: usize) bool {
+        return self.current[vk];
+    }
+};
+```
+
+Now this works with the following event handling inside the windows message loop:
+
+```zig
+        WM_KEYDOWN => {
+            const user_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if (user_data == 0) return 0;
+            const state: *GameManager = @ptrFromInt(@as(usize, @bitCast(user_data)));
+
+            const vk: usize = @intCast(wParam);
+            const was_down = (lParam & (1 << 30)) != 0;
+            if (!was_down) {
+                // this is the actual "just went down" transition, not a repeat
+                state.platform.onKeyboardDown(vk);
+            }
+            return 0;
+        },
+        WM_KEYUP => {
+            const user_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if (user_data == 0) return 0;
+            const state: *GameManager = @ptrFromInt(@as(usize, @bitCast(user_data)));
+
+            const vk: usize = @intCast(wParam);
+            state.platform.onKeyboardUp(vk);
+            return 0;
+        },
+        WM_KILLFOCUS => {
+            const user_data = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if (user_data == 0) return 0;
+            const state: *GameManager = @ptrFromInt(@as(usize, @bitCast(user_data)));
+
+            state.platform.onKillFocus();
+            return 0;
+        },
+```
+
+
+Now the logic is buried under some abstractions, which I found necessary to have. 
+Also I created another `Input` abstraction such that instead of testing a keyboard key is pressed, I check for a specific action has been pressed like this:
+
+
+```zig
+    pub fn update(self: *Self, dt: f64) bool {
+        const shouldQuit = self.platform.update();
+        if (shouldQuit) {
+            return true;
+        }
+
+        self.input.SyncWithKeyboardState(self.platform.keyboardState());
+
+        if (self.input.is_just_down(Input.Action.Quit)) {
+            return true;
+        }
+        scn.updateScene(&self.scene, dt);
+        return false;
+    }
+```
+
+Here's that input abstraction, you can define keymappings to it, and work with game specific actions, instead of individual keys:
+
+```zig
+const std = @import("std");
+const IntegerBitSet = std.bit_set.IntegerBitSet;
+const Self = @This();
+
+const KeyboardState = @import("loop.zig").KeyboardState;
+
+keymappings: [256]?Action = .{null} ** 256,
+
+action_is_just_down: IntegerBitSet(64) = .empty,
+action_is_just_up: IntegerBitSet(64) = .empty,
+action_is_down: IntegerBitSet(64) = .empty,
+
+pub const Action = enum {
+    Run_Left,
+    Run_Right,
+    Jump_Up,
+    Quit,
+};
+
+pub const ActionSign = enum {
+    Up,
+    Just_Down,
+    Just_Up,
+    Down,
+};
+
+pub fn add_keymapping(self: *Self, key: usize, action: Action) void {
+    self.keymappings[key] = action;
+}
+
+pub fn is_just_down(self: *const Self, action: Action) bool {
+    return self.action_is_just_down.isSet(@intFromEnum(action));
+}
+pub fn is_just_up(self: *const Self, action: Action) bool {
+    return self.action_is_just_up.isSet(@intFromEnum(action));
+}
+pub fn is_down(self: *const Self, action: Action) bool {
+    return self.action_is_down.isSet(@intFromEnum(action));
+}
+
+pub fn getActionSign(self: *const Self, action: Action) ActionSign {
+    if (self.is_just_down(action)) return ActionSign.Just_Down;
+    if (self.is_just_up(action)) return ActionSign.Just_Up;
+    if (self.is_down(action)) return ActionSign.Down;
+    return ActionSign.Up;
+}
+
+pub fn onDown(self: *Self, key: usize) void {
+    if (self.keymappings[key]) |action| {
+        if (self.is_down(action)) return;
+        self.action_is_just_down.set(@intFromEnum(action));
+    }
+}
+pub fn onUp(self: *Self, key: usize) void {
+    if (self.keymappings[key]) |action| {
+        self.action_is_just_up.set(@intFromEnum(action));
+    }
+}
+
+pub fn update(self: *const Self) void {
+    var it = self.action_is_just_down.iterator();
+    while (it.next()) |action_down| {
+        self.action_is_down.set(action_down);
+    }
+
+    var it2 = self.action_is_just_up.iterator();
+    while (it2.next()) |action_up| {
+        self.action_is_down.unset(action_up);
+    }
+
+    self.action_is_just_down = .empty;
+    self.action_is_just_up = .empty;
+}
+
+pub fn SyncWithKeyboardState(self: *Self, keyboard: *const KeyboardState) void {
+    for (0..256) |vk| {
+        if (self.keymappings[vk] != null) {
+            if (keyboard.justPressed(vk)) {
+                self.onDown(vk);
+            }
+            if (keyboard.justReleased(vk)) {
+                self.onUp(vk);
+            }
+            if (keyboard.isHeld(vk)) {
+                self.onDown(vk);
+            }
+        }
+    }
+}
+```
+
+As always, here's the current version that quits when you press Q, [v0.5.0](https://github.com/eguneys/monsden/releases/tag/v0.5.0), and don't forget to `zig build run --watch`.
